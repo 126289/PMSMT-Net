@@ -1,2 +1,2 @@
 # PMSMT-Net
-The associated code and dataset will be uploaded and improved gradually in the future.
+This code base contains the code of the PMSMT-Net model and the datasets used.

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from modules import EncoderBlock, VR_CBAMBlock, RFB_PSCBlock
-from classifier import MultiInputClassifier
+from classifier import EnsembleClassifier
 
 class PMSMTNet(nn.Module):
     def __init__(self, in_channels=1, num_classes=3, base_channels=64):
@@ -33,7 +33,7 @@ class PMSMTNet(nn.Module):
         self.seg_out = nn.Conv2d(base_channels, 1, kernel_size=1)
 
         # --------- Classification branch ---------
-        self.classifier = MultiInputClassifier(num_classes=num_classes)
+        self.classifier = EnsembleClassifier(num_classes=num_classes)
 
     def forward(self, x, edge_img=None, morph_img=None):
         # --------- Encoder path ---------

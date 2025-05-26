@@ -44,8 +44,7 @@ class EnsembleClassifier(nn.Module):
         pred2 = torch.argmax(out2, dim=1)
         pred3 = torch.argmax(out3, dim=1)
 
-        # Majority voting
-        preds = torch.stack([pred1, pred2, pred3], dim=0)  # (3, B)
+        preds = torch.stack([pred1, pred2, pred3], dim=0) 
         final_pred = []
         for i in range(preds.size(1)):
             vals, counts = torch.unique(preds[:, i], return_counts=True)

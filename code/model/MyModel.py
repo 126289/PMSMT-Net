@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from modules import EncoderBlock, VR_CBAMBlock, RFB_PSCBlock, MSDCBlock
+from classifier import EnsembleClassifier
 
 class MyModel(nn.Module):
     def __init__(self, in_channels=1, num_classes=3, base_channels=64, dropout_p=0.3):

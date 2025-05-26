@@ -1,3 +1,7 @@
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
 class MyModel(nn.Module):
     def __init__(self, in_channels=1, num_classes=3, base_channels=64, dropout_p=0.3):
         super(MyModel, self).__init__()
@@ -66,3 +70,10 @@ class MyModel(nn.Module):
         cls_out = self.classifier(seg_mask, edge_img, morph_img)
 
         return seg_mask, cls_out
+if __name__ == '__main__':
+    from torch.autograd import Variable
+    x = Variable(torch.rand(2, 3, 256, 256)).cuda()
+    model = MyModel().cuda()
+    c, s = model(x)
+    print('Output s shape:', s.shape)
+    print('Output c shape:', c.shape)

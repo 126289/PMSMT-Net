@@ -10,9 +10,7 @@ import all_transfroms
 from torchvision import transforms
 from dataset import ImageFolder
 from torch.utils.data import DataLoader,SubsetRandomSampler
-from model_mt import UNet
-from Model_Our import BaseLine, BaseLine_1
-from SModel.networks.multi_task_unet import MT_Net
+from MyModel import MyModel
 import torch.nn as nn
 from utils import DiceLoss, dice_coef, AutomaticWeightedLoss, \
     AutoWeightedLoss, AutoLoss, metric_seg, cmp_3, metric_seg_1
@@ -85,7 +83,7 @@ def main():
                              shuffle=False, sampler=test_sampler)
 
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        net = base2()
+        net = MyModel()
         net = net.to(device)
 
         train_loss, avg_val_loss, pre_ji, pre_dice, \

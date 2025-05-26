@@ -8,13 +8,11 @@ from torch import optim
 from torch.autograd import Variable
 import all_transfroms
 from torchvision import transforms
-from datasets import ImageFolder
+from dataset import ImageFolder
 from torch.utils.data import DataLoader,SubsetRandomSampler
 from model_mt import UNet
 from Model_Our import BaseLine, BaseLine_1
-# from SModel.MTLNet import BaseLine
 from SModel.networks.multi_task_unet import MT_Net
-# from Model_Last import BaseLine38
 import torch.nn as nn
 from utils import DiceLoss, dice_coef, AutomaticWeightedLoss, \
     AutoWeightedLoss, AutoLoss, metric_seg, cmp_3, metric_seg_1
@@ -39,23 +37,15 @@ val_transform = transforms.Compose([
     transforms.Normalize([0.330, 0.330, 0.330], [0.204, 0.204, 0.204])
 ])
 
-# ,
-#     transforms.Normalize([0.248, 0.248, 0.248], [0.151, 0.151, 0.151])
-
 transform = transforms.Compose([
     transforms.ToTensor(),
      transforms.Normalize([0.330, 0.330, 0.330], [0.204, 0.204, 0.204])
 ])
 
-# ,
-#     transforms.Normalize([0.248, 0.248, 0.248], [0.151, 0.151, 0.151])
-
 #transforms.Normalize([0.330, 0.330, 0.330], [0.204, 0.204, 0.204])
 
 target_transform = transforms.ToTensor()
 val_target_transform = transforms.Compose([transforms.Resize((256,256)), transforms.ToTensor()])  #transforms.Resize((256,256)),
-
-
 
 def main():
 

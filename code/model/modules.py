@@ -64,7 +64,7 @@ class VPMBlock(nn.Module):
         )
 
     def forward(self, x):
-        x_mean = torch.mean(x, dim=1, keepdim=True)  # convert to grayscale
+        x_mean = torch.mean(x, dim=1, keepdim=True)  
 
         edge_map = self.edge_extractor(x_mean)
         edge_feat = self.edge_conv(edge_map)
@@ -75,6 +75,7 @@ class VPMBlock(nn.Module):
         x_fuse = torch.cat([x, edge_feat, freq_feat], dim=1)
         out = self.fusion_conv(x_fuse)
         return out + x  # residual connection
+        
 class EncoderBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(EncoderBlock, self).__init__()
@@ -130,7 +131,7 @@ class SpatialAttention(nn.Module):
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
-        avg_out = torch.mean(x, dim=1, keepdim=True)  # shape: (B, 1, H, W)
+        avg_out = torch.mean(x, dim=1, keepdim=True) 
         max_out, _ = torch.max(x, dim=1, keepdim=True)
         x_cat = torch.cat([avg_out, max_out], dim=1)
         return self.sigmoid(self.conv(x_cat))

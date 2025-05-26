@@ -224,22 +224,15 @@ def train(model, train_loader, val_loader, test_loader, fold, num_epochs):
 
     pre_ji, pre_dice, hd95, asd, pre_class_acc, pre, recall, f1 = test(save_path, model, test_loader, fold)
 
-
-#np.around(np.mean(train_ji_pic), 3)
-
-#=======================================================================
     epochsn = np.arange(1, len(train_loss_pic) + 1, 1)
     plt.figure(figsize=(18, 5))
-    # figsize:指定figure的宽和高，单位为英寸；
     plt.subplot(131)
     y_sm = gaussian_filter1d(val_loss_pic, sigma=1)
-    # 一个figure对象包含了多个子图，可以使用subplot（）函数来绘制子图：
     plt.plot(epochsn, train_loss_pic, 'b', label='Training Loss')
     plt.plot(epochsn, y_sm, 'r', label='Validation Loss')
 
     plt.grid(color='gray', linestyle='--')
     plt.legend()
-    # plt.legend（）函数主要的作用就是给图加上图例
     plt.title('Loss, Epochs={}, Batch={}'.format(num_epochs, 5))
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
@@ -266,9 +259,7 @@ def train(model, train_loader, val_loader, test_loader, fold, num_epochs):
     plt.savefig('./Result/pic/savefig_{}.png'.format(fold))
     plt.show()
 
-
     return train_loss, avg_val_loss, pre_ji, pre_dice, hd95, asd, pre_class_acc, pre, recall, f1
-
 
 def validate(model, val_loader):
     losses = AvgMeter()
@@ -276,17 +267,13 @@ def validate(model, val_loader):
     avg_val_jc = AvgMeter()
     avg_val_hd = AvgMeter()
     avg_val_asd = AvgMeter()
-
-
     bce_logit = DiceLoss().cuda()
     #class_logit = nn.BCEWithLogitsLoss().cuda()
     class_logit = nn.CrossEntropyLoss().cuda()
     #awl = AutomaticWeightedLoss(2).cuda()
     awl = AutomaticWeightedLoss().cuda()
-
     val_preds = []
     val_trues = []
-
     model.eval()
 
     with torch.no_grad():
@@ -295,25 +282,20 @@ def validate(model, val_loader):
             input = input.cuda()
             target = target.cuda()
             label = label.cuda()
-
             pre_class, output = model(input)
-
             seg_loss = bce_logit(output, target)
             class_loss = class_logit(pre_class, label)
             loss = awl(seg_loss, class_loss)
             #loss = 0.6*seg_loss+0.4*class_loss
             dc, jc, hdc, asdc = metric_seg(output, target)
-
             avg_val_dice.update(dc, input.size(0))
             avg_val_jc.update(jc, input.size(0))
             avg_val_hd.update(hdc, input.size(0))
             avg_val_asd.update(asdc, input.size(0))
-
             pre_class = torch.sigmoid(pre_class)
             predict_class = torch.max(pre_class, dim=1)[1]
             val_preds.extend(predict_class.detach().cpu().numpy())
             val_trues.extend(label.detach().cpu().numpy())
-
             losses.update(loss.item(), input.size(0))
     val_loss = losses.avg
 
@@ -322,11 +304,9 @@ def validate(model, val_loader):
     sklearn_recall = recall_score(val_trues, val_preds, average='macro')
     sklearn_f1 = f1_score(val_trues, val_preds, average='weighted')
 
-
     return val_loss, np.around(avg_val_dice.avg, 3), np.around(avg_val_jc.avg, 3), \
         np.around(avg_val_hd.avg, 3), np.around(avg_val_asd.avg, 3),\
         sklearn_accuracy, sklearn_precision, sklearn_recall, sklearn_f1
-
 
 def test(save_path, model, test_loader, fold):
 
@@ -344,7 +324,6 @@ def test(save_path, model, test_loader, fold):
     model.eval()
     with torch.no_grad():
       for i, (input, target, label) in enumerate(test_loader):
-
           image = Variable(input).cuda()
           target = Variable(target).cuda()
           label = Variable(label).cuda()
@@ -382,12 +361,10 @@ def test(save_path, model, test_loader, fold):
           hd95, asd = cmp_3(pro, target)
           HD95_1.append(hd95)
           ASD_1.append(asd)
-
     sklearn_accuracy = accuracy_score(test_trues, test_preds)
     sklearn_precision = precision_score(test_trues, test_preds, average='weighted')
     sklearn_recall = recall_score(test_trues, test_preds, average='macro')
     sklearn_f1 = f1_score(test_trues, test_preds, average='weighted')
-
     print('Test Result:\n''Segmentation:\n Jaccard:{:.2%} '
           'Dice:{:.2%} HD95:{:.2f} ASD:{:.2f}'.format(np.around(np.mean(JI), 3),
                                                       np.around(np.mean(Dices), 3),
@@ -399,23 +376,16 @@ def test(save_path, model, test_loader, fold):
                                                       sklearn_recall,
                                                       sklearn_f1))
 
-
     return np.around(np.mean(JI), 3), np.around(np.mean(Dices), 3), np.around(np.mean(HD95_1), 3),\
         np.around(np.mean(ASD_1), 3),sklearn_accuracy, sklearn_precision, sklearn_recall, sklearn_f1
 
-
-
-
-
 if __name__ == "__main__":
     seed = 2
-    #seed = 2
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
-
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
     main()

@@ -23,11 +23,11 @@ class PMSMTNet(nn.Module):
         self.up2 = RFB_PSCBlock(base_channels*4, base_channels*2)
         self.up1 = RFB_PSCBlock(base_channels*2, base_channels)
 
-        # --------- Skip Connection Attention ---------
-        self.cbam4 = VR_CBAMBlock(base_channels*8)
-        self.cbam3 = VR_CBAMBlock(base_channels*4)
-        self.cbam2 = VR_CBAMBlock(base_channels*2)
-        self.cbam1 = VR_CBAMBlock(base_channels)
+        # --------- Skip Connection Attention ---------     
+        self.cbam4 = VR_CBAMBlock(base_channels*8，num_res_blocks=4)
+        self.cbam3 = VR_CBAMBlock(base_channels*4，num_res_blocks=3)
+        self.cbam2 = VR_CBAMBlock(base_channels*2，num_res_blocks=2)
+        self.cbam1 = VR_CBAMBlock(base_channels，num_res_blocks=1)
 
         # --------- Segmentation head ---------
         self.seg_out = nn.Conv2d(base_channels, 1, kernel_size=1)

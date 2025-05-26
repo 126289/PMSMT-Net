@@ -167,48 +167,37 @@ class RFB_PSCBlock(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(RFB_PSCBlock, self).__init__()
         inter_channels = out_channels // 4
-
-        self.branch0 = nn.Sequential(
-            nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0),
-            nn.BatchNorm2d(inter_channels),
-            nn.ReLU(inplace=True)
-        )
         self.branch1 = nn.Sequential(
-            nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0),
-            nn.BatchNorm2d(inter_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(inter_channels, inter_channels, kernel_size=3, stride=1, padding=1, dilation=1),
+            nn.Conv2d(in_channels, inter_channels, kernel_size=1),
             nn.BatchNorm2d(inter_channels),
             nn.ReLU(inplace=True)
         )
         self.branch2 = nn.Sequential(
-            nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0),
-            nn.BatchNorm2d(inter_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(inter_channels, inter_channels, kernel_size=3, stride=1, padding=2, dilation=2),
+            nn.Conv2d(in_channels, inter_channels, kernel_size=3, padding=1, dilation=1),
             nn.BatchNorm2d(inter_channels),
             nn.ReLU(inplace=True)
         )
         self.branch3 = nn.Sequential(
-            nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0),
-            nn.BatchNorm2d(inter_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(inter_channels, inter_channels, kernel_size=3, stride=1, padding=3, dilation=3),
+            nn.Conv2d(in_channels, inter_channels, kernel_size=3, padding=2, dilation=2),
             nn.BatchNorm2d(inter_channels),
             nn.ReLU(inplace=True)
         )
-
-        self.conv_cat = nn.Sequential(
-            nn.Conv2d(inter_channels * 4, out_channels, kernel_size=3, padding=1),
+        self.branch4 = nn.Sequential(
+            nn.Conv2d(in_channels, inter_channels, kernel_size=3, padding=3, dilation=3),
+            nn.BatchNorm2d(inter_channels),
+            nn.ReLU(inplace=True)
+        )
+        self.fusion = nn.Sequential(
+            nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, groups=out_channels),  # depthwise
+            nn.Conv2d(out_channels, out_channels, kernel_size=1),  # pointwise
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True)
         )
-
     def forward(self, x):
-        b0 = self.branch0(x)
         b1 = self.branch1(x)
         b2 = self.branch2(x)
         b3 = self.branch3(x)
-        out = torch.cat([b0, b1, b2, b3], dim=1)
-        out = self.conv_cat(out)
+        b4 = self.branch4(x)
+        out = torch.cat([b1, b2, b3, b4], dim=1)  # concat on channel
+        out = self.fusion(out)
         return out

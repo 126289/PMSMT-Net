@@ -9,10 +9,10 @@ class PMSMTNet(nn.Module):
         super(PMSMTNet, self).__init__()
 
         # --------- Encoder blocks ---------
-        self.enc1 = EncoderBlock(base_channels*1, base_channels*64)
-        self.enc2 = EncoderBlock(base_channels*64, base_channels*128)
-        self.enc3 = EncoderBlock(base_channels*128, base_channels*256)
-        self.enc4 = EncoderBlock(base_channels*256, base_channels*512)
+        self.enc1 = EncoderBlock(base_channels*1, base_channels*1)
+        self.enc2 = EncoderBlock(base_channels*1, base_channels*2)
+        self.enc3 = EncoderBlock(base_channels*2, base_channels*4)
+        self.enc4 = EncoderBlock(base_channels*4, base_channels*8)
 
         # --------- Bottleneck ---------
         self.bottleneck = MSDCBlock(base_channels*8, base_channels*16)
@@ -37,13 +37,13 @@ class PMSMTNet(nn.Module):
 
     def forward(self, x, edge_img=None, morph_img=None):
         # --------- Encoder path ---------
-        e1 = self.vpm1(self.enc1(x))    # out: C
-        e2 = self.vpm2(self.enc2(F.max_pool2d(e1, 2)))  # out: 2C
-        e3 = self.vpm3(self.enc3(F.max_pool2d(e2, 2)))  # out: 4C
-        e4 = self.vpm4(self.enc4(F.max_pool2d(e3, 2)))  # out: 8C
+        e1 = self.enc1(x)    # out: C
+        e2 = self.enc2(F.max_pool2d(e1, 2))  
+        e3 = self.enc3(F.max_pool2d(e2, 2))
+        e4 = self.enc4(F.max_pool2d(e3, 2))
 
         # --------- Bottleneck ---------
-        bn = self.bottleneck(F.max_pool2d(e4, 2))       # out: 16C
+        bn = self.bottleneck(F.max_pool2d(e4, 2))      
 
         # --------- Decoder path ---------
         d4 = self.up4(bn) + self.cbam4(e4)

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from modules import MSDCBlock, VPMBlock, VR_CBAMBlock, RFB_PSCBlock
+from modules import EncoderBlock, VR_CBAMBlock, RFB_PSCBlock
 from classifier import MultiInputClassifier
 
 class PMSMTNet(nn.Module):
@@ -9,17 +9,10 @@ class PMSMTNet(nn.Module):
         super(PMSMTNet, self).__init__()
 
         # --------- Encoder blocks ---------
-        self.enc1 = MSDCBlock(in_channels, base_channels)
-        self.vpm1 = VPMBlock(base_channels)
-
-        self.enc2 = MSDCBlock(base_channels, base_channels*2)
-        self.vpm2 = VPMBlock(base_channels*2)
-
-        self.enc3 = MSDCBlock(base_channels*2, base_channels*4)
-        self.vpm3 = VPMBlock(base_channels*4)
-
-        self.enc4 = MSDCBlock(base_channels*4, base_channels*8)
-        self.vpm4 = VPMBlock(base_channels*8)
+        self.enc1 = EncoderBlock(base_channels*1, base_channels*64)
+        self.enc2 = EncoderBlock(base_channels*64, base_channels*128)
+        self.enc3 = EncoderBlock(base_channels*128, base_channels*256)
+        self.enc4 = EncoderBlock(base_channels*256, base_channels*512)
 
         # --------- Bottleneck ---------
         self.bottleneck = MSDCBlock(base_channels*8, base_channels*16)

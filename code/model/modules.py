@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# 视觉感知模块
+# MSDC+VPM
 class MSDCBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(MSDCBlock, self).__init__()
@@ -87,6 +87,21 @@ class EncoderBlock(nn.Module):
         return x
 
 # VR_CBAMBlock
+class ResidualBlock(nn.Module):
+    def __init__(self, channels):
+        super(ResidualBlock, self).__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(channels)
+        )
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        return self.relu(x + self.block(x))
+
 class ChannelAttention(nn.Module):
     def __init__(self, in_channels, ratio=8):
         super(ChannelAttention, self).__init__()
@@ -122,24 +137,29 @@ class SpatialAttention(nn.Module):
 
 
 class VR_CBAMBlock(nn.Module):
-    def __init__(self, in_channels):
+    def __init__(self, channels, num_res_blocks=2):
         super(VR_CBAMBlock, self).__init__()
-        # Variable convolution: use grouped + dilated conv to improve receptive field
-        self.conv = nn.Sequential(
-            nn.Conv2d(in_channels, in_channels, 3, padding=1, dilation=1, groups=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels, in_channels, 3, padding=2, dilation=2, groups=1),
+
+        self.res_blocks = nn.Sequential(*[ResidualBlock(channels) for _ in range(num_res_blocks)])
+        self.channel_attention = ChannelAttention(channels)
+        self.spatial_attention = SpatialAttention()
+
+        self.fusion_conv = nn.Sequential(
+            nn.Conv2d(channels * 2, channels, kernel_size=1),
+            nn.BatchNorm2d(channels),
             nn.ReLU(inplace=True)
         )
-        self.ca = ChannelAttention(in_channels)
-        self.sa = SpatialAttention()
 
-    def forward(self, x):
-        res = x
-        out = self.conv(x)  # variable receptive conv
-        out = self.ca(out) * out
-        out = self.sa(out) * out
-        return out + res  # residual connection
+    def forward(self, Tn, Tn_plus1=None):
+        x = self.res_blocks(Tn) 
+        if Tn_plus1 is not None:
+            x = torch.cat([x, Tn_plus1], dim=1)
+            x = self.fusion_conv(x)
+        ca = self.channel_attention(x)
+        sa = self.spatial_attention(x)
+        x = ca * x
+        x = sa * x
+        return x
 
 
 # RFB_PSCBlock

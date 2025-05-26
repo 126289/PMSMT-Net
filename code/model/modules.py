@@ -17,20 +17,70 @@ class MSDCBlock(nn.Module):
         return self.relu(self.bn(out))
 
 
-# 视觉感知模块（融合边缘和频域信息）
+# 视觉感知模块
+class RobertsEdge(nn.Module):
+    def __init__(self):
+        super(RobertsEdge, self).__init__()
+        kernel_x = torch.tensor([[1, 0], [0, -1]], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+        kernel_y = torch.tensor([[0, 1], [-1, 0]], dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+        self.register_buffer('weight_x', kernel_x)
+        self.register_buffer('weight_y', kernel_y)
+
+    def forward(self, x):
+        edge_x = F.conv2d(x, self.weight_x, padding=0)
+        edge_y = F.conv2d(x, self.weight_y, padding=0)
+        edge = torch.sqrt(edge_x ** 2 + edge_y ** 2 + 1e-6)
+        return edge
+
+
+# ---- Approximate 2D FRFT via Frequency Mask ----
+class FRFT2D(nn.Module):
+    def __init__(self):
+        super(FRFT2D, self).__init__()
+
+    def forward(self, x):
+        fft = torch.fft.fft2(x)
+        amp = torch.abs(fft)
+        amp = amp / (torch.max(amp) + 1e-8)
+        return amp.unsqueeze(1)  # add channel dim
+
+# ---- VPM Block ----
 class VPMBlock(nn.Module):
-    def __init__(self, channels):
+    def __init__(self, in_channels):
         super(VPMBlock, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(channels, channels, 3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(channels, channels, 3, padding=1),
+        self.edge_extractor = RobertsEdge()
+        self.frft_extractor = FRFT2D()
+
+        self.edge_conv = nn.Sequential(
+            nn.Conv2d(1, in_channels, 3, padding=1),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True)
+        )
+        self.freq_conv = nn.Sequential(
+            nn.Conv2d(1, in_channels, 3, padding=1),
+            nn.BatchNorm2d(in_channels),
             nn.Sigmoid()
         )
 
+        self.fusion_conv = nn.Sequential(
+            nn.Conv2d(in_channels * 3, in_channels, 1),
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(inplace=True)
+        )
+
     def forward(self, x):
-        attention = self.conv(x)
-        return x * attention
+        # 原始特征图 x: (B, C, H, W)
+        x_mean = torch.mean(x, dim=1, keepdim=True)  # convert to grayscale
+
+        edge_map = self.edge_extractor(x_mean)
+        edge_feat = self.edge_conv(edge_map)
+
+        freq_map = self.frft_extractor(x_mean)
+        freq_feat = self.freq_conv(freq_map)
+
+        x_fuse = torch.cat([x, edge_feat, freq_feat], dim=1)
+        out = self.fusion_conv(x_fuse)
+        return out + x  # residual connection
 
 
 # 残差 + CBAM 注意力模块

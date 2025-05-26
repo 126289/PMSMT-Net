@@ -1,6 +1,6 @@
-class PMSMTNet(nn.Module):
+class MyModel(nn.Module):
     def __init__(self, in_channels=1, num_classes=3, base_channels=64, dropout_p=0.3):
-        super(PMSMTNet, self).__init__()
+        super(MyModel, self).__init__()
 
         self.dropout_p = dropout_p
         self.dropout = nn.Dropout2d(p=dropout_p)

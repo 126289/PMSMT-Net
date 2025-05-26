@@ -81,48 +81,109 @@ class VPMBlock(nn.Module):
         return out + x  # residual connection
 
 
-# 残差 + CBAM 注意力模块
-class VR_CBAMBlock(nn.Module):
-    def __init__(self, channels):
-        super(VR_CBAMBlock, self).__init__()
-        self.conv = nn.Conv2d(channels, channels, 3, padding=1)
-        self.relu = nn.ReLU(inplace=True)
-        self.ca = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Conv2d(channels, channels // 8, 1),
+# VR_CBAMBlock
+class ChannelAttention(nn.Module):
+    def __init__(self, in_channels, ratio=8):
+        super(ChannelAttention, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)  # shape: (B, C, 1, 1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+        self.fc = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels // ratio, 1, bias=False),
             nn.ReLU(),
-            nn.Conv2d(channels // 8, channels, 1),
-            nn.Sigmoid()
+            nn.Conv2d(in_channels // ratio, in_channels, 1, bias=False)
         )
-        self.sa = nn.Sequential(
-            nn.Conv2d(2, 1, 7, padding=3),
-            nn.Sigmoid()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc(self.avg_pool(x))
+        max_out = self.fc(self.max_pool(x))
+        out = avg_out + max_out
+        return self.sigmoid(out)
+
+
+class SpatialAttention(nn.Module):
+    def __init__(self, kernel_size=7):
+        super(SpatialAttention, self).__init__()
+        padding = kernel_size // 2
+        self.conv = nn.Conv2d(2, 1, kernel_size=kernel_size, padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)  # shape: (B, 1, H, W)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        x_cat = torch.cat([avg_out, max_out], dim=1)
+        return self.sigmoid(self.conv(x_cat))
+
+
+class VR_CBAMBlock(nn.Module):
+    def __init__(self, in_channels):
+        super(VR_CBAMBlock, self).__init__()
+        # Variable convolution: use grouped + dilated conv to improve receptive field
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, 3, padding=1, dilation=1, groups=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels, in_channels, 3, padding=2, dilation=2, groups=1),
+            nn.ReLU(inplace=True)
         )
+        self.ca = ChannelAttention(in_channels)
+        self.sa = SpatialAttention()
 
     def forward(self, x):
         res = x
-        x = self.relu(self.conv(x))
-        ca_out = self.ca(x) * x
-
-        max_pool = torch.max(x, dim=1, keepdim=True)[0]
-        avg_pool = torch.mean(x, dim=1, keepdim=True)
-        sa_input = torch.cat([avg_pool, max_pool], dim=1)
-        sa_out = self.sa(sa_input) * ca_out
-
-        return sa_out + res
+        out = self.conv(x)  # variable receptive conv
+        out = self.ca(out) * out
+        out = self.sa(out) * out
+        return out + res  # residual connection
 
 
-# 解码模块：RFB + 可分离卷积
+# RFB_PSCBlock
 class RFB_PSCBlock(nn.Module):
-    def __init__(self, in_ch, out_ch):
+    def __init__(self, in_channels, out_channels):
         super(RFB_PSCBlock, self).__init__()
-        self.depthwise = nn.Conv2d(in_ch, in_ch, kernel_size=3, padding=1, groups=in_ch)
-        self.pointwise = nn.Conv2d(in_ch, out_ch, kernel_size=1)
-        self.bn = nn.BatchNorm2d(out_ch)
-        self.relu = nn.ReLU(inplace=True)
+        inter_channels = out_channels // 4
+
+        self.branch0 = nn.Sequential(
+            nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(inter_channels),
+            nn.ReLU(inplace=True)
+        )
+        self.branch1 = nn.Sequential(
+            nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(inter_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(inter_channels, inter_channels, kernel_size=3, stride=1, padding=1, dilation=1),
+            nn.BatchNorm2d(inter_channels),
+            nn.ReLU(inplace=True)
+        )
+        self.branch2 = nn.Sequential(
+            nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(inter_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(inter_channels, inter_channels, kernel_size=3, stride=1, padding=2, dilation=2),
+            nn.BatchNorm2d(inter_channels),
+            nn.ReLU(inplace=True)
+        )
+        self.branch3 = nn.Sequential(
+            nn.Conv2d(in_channels, inter_channels, kernel_size=1, stride=1, padding=0),
+            nn.BatchNorm2d(inter_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(inter_channels, inter_channels, kernel_size=3, stride=1, padding=3, dilation=3),
+            nn.BatchNorm2d(inter_channels),
+            nn.ReLU(inplace=True)
+        )
+
+        self.conv_cat = nn.Sequential(
+            nn.Conv2d(inter_channels * 4, out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True)
+        )
 
     def forward(self, x):
-        x = self.depthwise(x)
-        x = self.pointwise(x)
-        x = self.bn(x)
-        return self.relu(x)
+        b0 = self.branch0(x)
+        b1 = self.branch1(x)
+        b2 = self.branch2(x)
+        b3 = self.branch3(x)
+        out = torch.cat([b0, b1, b2, b3], dim=1)
+        out = self.conv_cat(out)
+        return out

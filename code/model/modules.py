@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# 多尺度空洞卷积块
+# 视觉感知模块
 class MSDCBlock(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(MSDCBlock, self).__init__()
@@ -16,8 +16,6 @@ class MSDCBlock(nn.Module):
         out = self.conv1(x) + self.conv2(x) + self.conv3(x)
         return self.relu(self.bn(out))
 
-
-# 视觉感知模块
 class RobertsEdge(nn.Module):
     def __init__(self):
         super(RobertsEdge, self).__init__()

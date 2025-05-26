@@ -30,8 +30,6 @@ class RobertsEdge(nn.Module):
         edge = torch.sqrt(edge_x ** 2 + edge_y ** 2 + 1e-6)
         return edge
 
-
-# ---- Approximate 2D FRFT via Frequency Mask ----
 class FRFT2D(nn.Module):
     def __init__(self):
         super(FRFT2D, self).__init__()
@@ -42,7 +40,6 @@ class FRFT2D(nn.Module):
         amp = amp / (torch.max(amp) + 1e-8)
         return amp.unsqueeze(1)  # add channel dim
 
-# ---- VPM Block ----
 class VPMBlock(nn.Module):
     def __init__(self, in_channels):
         super(VPMBlock, self).__init__()
@@ -67,7 +64,6 @@ class VPMBlock(nn.Module):
         )
 
     def forward(self, x):
-        # 原始特征图 x: (B, C, H, W)
         x_mean = torch.mean(x, dim=1, keepdim=True)  # convert to grayscale
 
         edge_map = self.edge_extractor(x_mean)
@@ -79,13 +75,22 @@ class VPMBlock(nn.Module):
         x_fuse = torch.cat([x, edge_feat, freq_feat], dim=1)
         out = self.fusion_conv(x_fuse)
         return out + x  # residual connection
+class EncoderBlock(nn.Module):
+    def __init__(self, in_ch, out_ch):
+        super(EncoderBlock, self).__init__()
+        self.msdc = MSDCBlock(in_ch, out_ch)
+        self.vpm = VPMBlock(out_ch)
 
+    def forward(self, x):
+        x = self.msdc(x)
+        x = self.vpm(x)
+        return x
 
 # VR_CBAMBlock
 class ChannelAttention(nn.Module):
     def __init__(self, in_channels, ratio=8):
         super(ChannelAttention, self).__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)  # shape: (B, C, 1, 1)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1) 
         self.max_pool = nn.AdaptiveMaxPool2d(1)
 
         self.fc = nn.Sequential(
